@@ -198,15 +198,22 @@ def db_import(module, host, user, password, db_name, target, all_databases, port
 
     if comp_prog_path:
         p1 = subprocess.Popen([comp_prog_path, '-dc', target], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        p2 = subprocess.Popen(cmd, stdin=p1.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        (stdout2, stderr2) = p2.communicate()
-        p1.stdout.close()
-        p1.wait()
-        if p1.returncode != 0:
-            stderr1 = p1.stderr.read()
-            return p1.returncode, '', stderr1
-        else:
-            return p2.returncode, stdout2, stderr2
+        line_buffer = ''
+        err_message = ''
+        for line in p1.stdout:
+            line = ''.join((line_buffer, line)).strip('\n')
+            if len(line) > 0:
+                if line[-1] == ';':
+                    line_buffer = ''
+                    cmd.append('-e')
+                    cmd.append('{}'.format(line))
+                    p2 = subprocess.Popen(cmd, stderr=subprocess.PIPE)
+                    for err_line in p2.stderr:
+                        err_message = '\n'.join((err_message, err_line))
+                    cmd = cmd[:-2]
+                else:
+                    line_buffer = line
+        return 0, '', err_message
     else:
         cmd = ' '.join(cmd)
         cmd += " < %s" % pipes.quote(target)
