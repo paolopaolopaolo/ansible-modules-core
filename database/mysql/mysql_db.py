@@ -197,35 +197,14 @@ def db_import(module, host, user, password, db_name, target, all_databases, port
         comp_prog_path = module.get_bin_path('xz', required=True)
 
     if comp_prog_path:
-        p1 = subprocess.Popen([comp_prog_path, '-dc', target], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        line_buffer = ''
-        err_message = ''
-        p2_return_code = None
-        for line in p1.stdout:
-            line = ''.join((line_buffer, line)).strip('\n')
-            if len(line) > 0:
-                if line[-1] == ';':
-                    line_buffer = ''
-                    cmd.append('-e')
-                    cmd.append('{}'.format(line))
-                    p2 = subprocess.Popen(cmd, stderr=subprocess.PIPE)
-                    for err_line in p2.stderr:
-                        err_message = '\n'.join((err_message, err_line))
-                    p2.wait()
-                    p2_return_code = p2.returncode
-                    cmd = cmd[:-2]
-                else:
-                    line_buffer = line
-        p1.wait()
-        if p1.returncode != 0:
-            return p1.returncode, '', p1.stderr
-        else:
-            return p2_return_code, '', err_message
+        extract_file_to_sql_cmd = ' '.join([comp_prog_path, '-dc', target])
+        run_mysql_cmd = ' '.join(cmd)
+        cmd = '{} | {}'.format(extract_file_to_sql_cmd, run_mysql_cmd)
     else:
         cmd = ' '.join(cmd)
         cmd += " < %s" % pipes.quote(target)
-        rc, stdout, stderr = module.run_command(cmd, use_unsafe_shell=True)
-        return rc, stdout, stderr
+    rc, stdout, stderr = module.run_command(cmd, use_unsafe_shell=True)
+    return rc, stdout, stderr
 
 def db_create(cursor, db, encoding, collation):
     query_params = dict(enc=encoding, collate=collation)
